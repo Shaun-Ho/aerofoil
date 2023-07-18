@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aerofoil"
+version = "0.0.1"
+authors = [
+    {name = "Shaun Ho", email = "sefh98@gmail.com"},
+]
+description = "Library for using neural networks to predict performance of aerofoils"
+requires-python = ">=3.10"
+
+dependencies = [
+    "numpy>=1.22",
+    "pandas>=1.4",
+    "scipy>=1.10",
+    "pytest>=7.3",
+    "plotly>=2.20"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# exclude = ["docs*", "tests*"]
+
+# [tool.setuptools]
+# include-package-data = true
+
+# [tool.setuptools.package-data]
+# "package_name" = ["path_to_data"]
+
+# [tool.pytest.ini_options]
+# testpaths = ["tests"]
+
+# [tool.packages]

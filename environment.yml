@@ -1,0 +1,6 @@
+name: aerofoil
+channels:
+  - anaconda
+  - defaults
+dependencies:
+  - python>=3.10
