@@ -1,12 +1,10 @@
 from __future__ import annotations
-import pathlib as pl
+import pathlib as plib
 import subprocess as sp
-import sys
-from decimal import Decimal
 import numpy as np
 
 
-file_path = pl.Path(__file__).parent
+file_path = plib.Path(__file__).parent
 xfoil_exe_path = file_path / "xfoil_6.99"
 data_path = file_path / "data"
 
@@ -20,65 +18,81 @@ def open_xfoil():
 
     return xf
 
-def run_performance(xf:sp.Popen, **kwargs):
-    # check if data path is available
-    save_path = data_path / f"{kwargs['aerofoil_name']}/Re{int(kwargs['Re']):.0e}"
-    
-    polar_path = (save_path / "polar_file.txt\n").relative_to(file_path).as_posix()
+def run_performance(xf:sp.Popen, Re:float, **kwargs):
+    save_path = data_path / f"{aerofoil_name}/Re{Re:.0e}"
+    polar_name = (save_path / "polar_file.txt\n").relative_to(file_path).as_posix()
 
+    # setting polar save path
+    xf.stdin.write(b"PACC\n")
+    xf.stdin.write(polar_name.encode())
+    xf.stdin.write(b'\n')
+    # running sequential alpha performance
+    xf.stdin.write(f"ASEQ {kwargs['alpha_i']} {kwargs['alpha_f']} {kwargs['alpha_step']}\n".encode())
+    xf.stdin.write(b'\n')
+    xf.stdin.write(b"quit\n")
+    xf.stdin.close()
+
+def setup_run(xf:sp.Popen, aerofoil_name:str, Re:float, load=False, **kwargs):
+    save_path = data_path / f"{aerofoil_name}/Re{Re:.0e}"
     if not save_path.exists():
         save_path.mkdir(parents=True)
     
-    # check OS TODO: implement support for non windows
-    # if sys.platform.startswith("win"):
-    #     save_path = pl.PureWindowsPath(save_path)
-
-    
-    load = False
-    name = "J30"
-    # disabling popup
+    # loading
     xf.stdin.write(b"PLOP\n")
     xf.stdin.write(b"G F\n")
     xf.stdin.write(b"\n")
     if load is True:
-        xf.stdin.write(f"LOAD {name}".encode())
-    xf.stdin.write(b"NACA 0012\n")
+        xf.stdin.write(f"LOAD {aerofoil_name}".encode())
+    xf.stdin.write(f"{aerofoil_name}\n".encode())
     xf.stdin.write(b"PANE\n")
     xf.stdin.write(b"OPER\n")
-    xf.stdin.write(f"Visc {kwargs['Re']}\n".encode())
+    xf.stdin.write(f"Visc {Re}\n".encode())
     xf.stdin.write(f"ITER {n_iter_terminate}\n".encode())
+    
     # xf.stdin.write(b"VPAR\n")
     # xf.stdin.write("XTR {} {}\n".format(Xtrtop,Xtrbot)) TODO: implement transition
     # xf.stdin.write(f"N {kwargs['N_crit']}\n".encode())
-    xf.stdin.write(b"PACC\n")
 
-    xf.stdin.write(polar_path.encode())
-    xf.stdin.write(b'\n')
+    return xf
     
-    xf.stdin.write(f"aseq {kwargs['alpha_i']} {kwargs['alpha_f']} {kwargs['alpha_step']}\n".encode())
-    xf.stdin.write(b"\n\n")
-
+    
+def run_pressure(xf:sp.Popen, Re:float, alpha: float, **kwargs):
+    save_path = data_path / f"{aerofoil_name}/Re{Re:.0e}"
+    cp_name = (save_path / f"{alpha:.1f}cp.txt\n").relative_to(file_path).as_posix()
+    # running specific alpha
+    xf.stdin.write(f"alfa {alpha}\n".encode())
+    # writing cp distribution
+    xf.stdin.write(b"cpwr\n")
+    xf.stdin.write(cp_name.encode())
+    xf.stdin.write(b'\n')
     xf.stdin.write(b"quit\n")
     xf.stdin.close()
 
-    xf.stdin.close()
-    
-def run_pressure(xf: sp.Popen):
-    xf.stdin.write(b"")
 
-
-def call_xfoil(**kwargs):
+def call_xfoil(aerofoil_name:str, **kwargs):
     if kwargs["Re_start"] == kwargs["Re_end"]:
         Re_list = [kwargs["Re_start"]]
     else:
         Re_list = np.linspace(kwargs["Re_start"], kwargs["Re_end"], kwargs["n_Re_intervals"]).tolist()
 
+    if kwargs["alpha_i"] == kwargs["alpha_f"]:
+        alpha_list = [kwargs["alpha_i"]]
+    else:
+        alpha_list = np.arange(kwargs["alpha_i"], kwargs["alpha_f"]+kwargs["alpha_step"], kwargs["alpha_step"]).tolist()
+
     # start a new process for each Re
     for Re in Re_list:
         xf = open_xfoil()
+        xf = setup_run(xf, aerofoil_name, Re, load=False ,**kwargs)
         run_performance(xf=xf, Re=Re, **kwargs)
-    return
 
+        # running presure
+        for alpha in alpha_list:
+            # start a new process for each cp
+            xf = open_xfoil()
+            xf = setup_run(xf, aerofoil_name, Re, load=False ,**kwargs)
+            run_pressure(xf, Re, alpha, **kwargs)
+        
 if __name__ == "__main__":
     # user inputs
     aerofoil_name = "NACA0012"
@@ -91,7 +105,7 @@ if __name__ == "__main__":
     # angle 
     angle_of_attack_start = -2
     angle_of_attack_end = 2
-    angle_of_attack_interval = .5
+    angle_of_attack_interval = 0.5
 
     # turbulence setting
     x_transition_top = None
