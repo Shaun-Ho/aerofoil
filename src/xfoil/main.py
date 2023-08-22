@@ -1,18 +1,27 @@
 from xfoil.xfoil_wrapper import call_xfoil
+from xfoil.formatting import format_dataset
+import pathlib as plib
+
+path = plib.Path(__file__).parent
+save_path = path.parents[1] / "data"
 
 if __name__ == "__main__":
     # user inputs
     aerofoil_name = "NACA0012"
 
+    do = "run" 
+    run_multi = True
+    n_processes = 6
+
     # viscoscity
     Re_start = 3e6
-    Re_end = 3e6
-    n_Re_intervals = 10
+    Re_end = 3e9
+    n_Re_intervals = 200
 
     # angle 
-    angle_of_attack_start = -2
-    angle_of_attack_end = 2
-    angle_of_attack_interval = 0.5
+    angle_of_attack_start = -5
+    angle_of_attack_end = 5
+    angle_of_attack_interval = 0.1
 
     # turbulence setting
     x_transition_top = None
@@ -20,9 +29,10 @@ if __name__ == "__main__":
     N_crit = 9
 
     # xfoil config
-    n_iter_terminate = 50
-   
-    call_xfoil(
+    n_iter_terminate = 100
+
+    if do == "run":
+        call_xfoil(
         aerofoil_name=aerofoil_name,
         Re_start=Re_start, 
         Re_end=Re_end,
@@ -30,8 +40,14 @@ if __name__ == "__main__":
         alpha_i=angle_of_attack_start,
         alpha_f=angle_of_attack_end,
         alpha_step=angle_of_attack_interval,
-        x_transition_top=x_transition_top,
-        x_transition_bot=x_transition_bot,
         n_iter_terminate=n_iter_terminate,
-        N_crit=N_crit,
+        run_multi=run_multi,
+        n_processes=n_processes
+        # x_transition_top=x_transition_top,
+        # x_transition_bot=x_transition_bot,
+        # N_crit=N_crit,
     )
+    elif do == "format":
+        df = format_dataset(aerofoil_name)
+        df.to_csv(save_path / f"{aerofoil_name}.csv")
+    

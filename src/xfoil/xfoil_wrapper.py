@@ -1,8 +1,11 @@
 from __future__ import annotations
+
+import os
 import pathlib as plib
 import subprocess as sp
-import numpy as np
+import multiprocessing
 
+import numpy as np
 
 file_path = plib.Path(__file__).parent
 xfoil_exe_path = file_path / "xfoil_6.99"
@@ -18,8 +21,7 @@ def open_xfoil():
 
     return xf
 
-def run_performance(xf:sp.Popen, Re:float, **kwargs):
-    save_path = data_path / f"{aerofoil_name}/Re{Re:.0e}"
+def run_performance(xf:sp.Popen, save_path:plib.Path, alpha_i:float, alpha_step:float, alpha_f:float=None):
     polar_name = (save_path / "polar_file.txt\n").relative_to(file_path).as_posix()
 
     # setting polar save path
@@ -27,16 +29,15 @@ def run_performance(xf:sp.Popen, Re:float, **kwargs):
     xf.stdin.write(polar_name.encode())
     xf.stdin.write(b'\n')
     # running sequential alpha performance
-    xf.stdin.write(f"ASEQ {kwargs['alpha_i']} {kwargs['alpha_f']} {kwargs['alpha_step']}\n".encode())
+    if alpha_f is None:
+        xf.stdin.write(f"alfa {alpha_i}\n".encode())
+    else:
+        xf.stdin.write(f"ASEQ {alpha_i} {alpha_f} {alpha_step}\n".encode())
     xf.stdin.write(b'\n')
     xf.stdin.write(b"quit\n")
     xf.stdin.close()
 
-def setup_run(xf:sp.Popen, aerofoil_name:str, Re:float, load=False, **kwargs):
-    save_path = data_path / f"{aerofoil_name}/Re{Re:.0e}"
-    if not save_path.exists():
-        save_path.mkdir(parents=True)
-    
+def setup_run(xf:sp.Popen, aerofoil_name:str, Re:float, load:bool=False, n_iter_terminate:int=100):   
     # loading
     xf.stdin.write(b"PLOP\n")
     xf.stdin.write(b"G F\n")
@@ -56,9 +57,8 @@ def setup_run(xf:sp.Popen, aerofoil_name:str, Re:float, load=False, **kwargs):
     return xf
     
     
-def run_pressure(xf:sp.Popen, Re:float, alpha: float, **kwargs):
-    save_path = data_path / f"{aerofoil_name}/Re{Re:.0e}"
-    cp_name = (save_path / f"{alpha:.1f}cp.txt\n").relative_to(file_path).as_posix()
+def run_pressure(xf:sp.Popen, save_path:plib.Path, alpha: float):
+    cp_name = (save_path / f"cp_dist_alpha={alpha:.1f}.txt\n").relative_to(file_path).as_posix()
     # running specific alpha
     xf.stdin.write(f"alfa {alpha}\n".encode())
     # writing cp distribution
@@ -68,63 +68,50 @@ def run_pressure(xf:sp.Popen, Re:float, alpha: float, **kwargs):
     xf.stdin.write(b"quit\n")
     xf.stdin.close()
 
+def run_xfoil(aerofoil_name:str, Re: float, alpha_i, alpha_step:float=.1, alpha_f:float=None):
+    # creating directory for save path
+    save_path = data_path / f"{aerofoil_name}/Re{Re:.2e}"
+    if not save_path.exists():
+        save_path.mkdir(parents=True)
 
-def call_xfoil(aerofoil_name:str, **kwargs):
-    if kwargs["Re_start"] == kwargs["Re_end"]:
-        Re_list = [kwargs["Re_start"]]
+    # deleting polar file if it already exists
+    if len(list(save_path.glob("polar_file.txt")))>0:
+        os.remove(save_path / "polar_file.txt")
+        print
+    # start new process for each Re
+    xf = open_xfoil()
+    xf = setup_run(xf, aerofoil_name, Re)
+
+    # constructing alpha array
+    if alpha_f is None:
+        alpha_list = [alpha_i]
     else:
-        Re_list = np.linspace(kwargs["Re_start"], kwargs["Re_end"], kwargs["n_Re_intervals"]).tolist()
+        alpha_list = np.arange(alpha_i, alpha_f + alpha_step, alpha_step).round(1).tolist()
 
-    if kwargs["alpha_i"] == kwargs["alpha_f"]:
-        alpha_list = [kwargs["alpha_i"]]
-    else:
-        alpha_list = np.arange(kwargs["alpha_i"], kwargs["alpha_f"]+kwargs["alpha_step"], kwargs["alpha_step"]).tolist()
+    run_performance(xf, save_path, alpha_i, alpha_step, alpha_f=alpha_f)
+    stdout, stderr = xf.communicate()
 
-    # start a new process for each Re
-    for Re in Re_list:
+    # running presure
+    for alpha in alpha_list:
+        # start a new process for each cp
         xf = open_xfoil()
-        xf = setup_run(xf, aerofoil_name, Re, load=False ,**kwargs)
-        run_performance(xf=xf, Re=Re, **kwargs)
+        xf = setup_run(xf, aerofoil_name, Re, load=False)
+        run_pressure(xf, save_path, alpha)
+        stdout, stderr = xf.communicate()
 
-        # running presure
-        for alpha in alpha_list:
-            # start a new process for each cp
-            xf = open_xfoil()
-            xf = setup_run(xf, aerofoil_name, Re, load=False ,**kwargs)
-            run_pressure(xf, Re, alpha, **kwargs)
-        
-if __name__ == "__main__":
-    # user inputs
-    aerofoil_name = "NACA0012"
-
-    # viscoscity
-    Re_start = 3e6
-    Re_end = 3e6
-    n_Re_intervals = 10
-
-    # angle 
-    angle_of_attack_start = -2
-    angle_of_attack_end = 2
-    angle_of_attack_interval = 0.5
-
-    # turbulence setting
-    x_transition_top = None
-    x_transition_bot = None
-    N_crit = 9
-
-    # xfoil config
-    n_iter_terminate = 50
-   
-    call_xfoil(
-        aerofoil_name=aerofoil_name,
-        Re_start=Re_start, 
-        Re_end=Re_end,
-        n_Re_intervals=n_Re_intervals,
-        alpha_i=angle_of_attack_start,
-        alpha_f=angle_of_attack_end,
-        alpha_step=angle_of_attack_interval,
-        x_transition_top=x_transition_top,
-        x_transition_bot=x_transition_bot,
-        n_iter_terminate=n_iter_terminate,
-        N_crit=N_crit,
-    )
+def call_xfoil(aerofoil_name:str, Re_start, alpha_i, alpha_f = None, alpha_step = .1, Re_end = None, n_Re_intervals = 10, **kwargs):
+    # constructing Reynolds number array
+    if Re_end is None:
+        Re_list = [Re_start]
+    else:
+        Re_list = np.linspace(Re_start, Re_end, n_Re_intervals).tolist()
+    # option to run multiprocessing
+    if kwargs["run_multi"] == True:
+            test = [(aerofoil_name, ) + (e,) + (alpha_i, alpha_step, alpha_f) for e in Re_list ]
+    try: 
+        if kwargs["run_multi"] == True:
+            with multiprocessing.Pool(processes=kwargs["n_processes"]) as pool:
+                pool.starmap(run_xfoil, [(aerofoil_name, ) + (e,) + (alpha_i, alpha_step, alpha_f) for e in Re_list ])
+    except:
+        for Re in Re_list:
+            run_xfoil(aerofoil_name, Re, alpha_i, alpha_step, alpha_f)
