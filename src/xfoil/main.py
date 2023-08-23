@@ -9,7 +9,7 @@ if __name__ == "__main__":
     # user inputs
     aerofoil_name = "NACA0012"
 
-    do = "run" 
+    do = "format" 
     run_multi = True
     n_processes = 6
 
@@ -48,6 +48,7 @@ if __name__ == "__main__":
         # N_crit=N_crit,
     )
     elif do == "format":
-        df = format_dataset(aerofoil_name)
+        df, coords = format_dataset(aerofoil_name)
         df.to_csv(save_path / f"{aerofoil_name}.csv")
+        coords.to_csv(save_path / "coords" / f"{aerofoil_name}.csv")
     

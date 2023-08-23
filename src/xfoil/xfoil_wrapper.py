@@ -106,12 +106,10 @@ def call_xfoil(aerofoil_name:str, Re_start, alpha_i, alpha_f = None, alpha_step 
     else:
         Re_list = np.linspace(Re_start, Re_end, n_Re_intervals).tolist()
     # option to run multiprocessing
+    
     if kwargs["run_multi"] == True:
-            test = [(aerofoil_name, ) + (e,) + (alpha_i, alpha_step, alpha_f) for e in Re_list ]
-    try: 
-        if kwargs["run_multi"] == True:
             with multiprocessing.Pool(processes=kwargs["n_processes"]) as pool:
                 pool.starmap(run_xfoil, [(aerofoil_name, ) + (e,) + (alpha_i, alpha_step, alpha_f) for e in Re_list ])
-    except:
+    else:
         for Re in Re_list:
             run_xfoil(aerofoil_name, Re, alpha_i, alpha_step, alpha_f)

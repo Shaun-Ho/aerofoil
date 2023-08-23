@@ -9,7 +9,7 @@ file_path = plib.Path(__file__).parent
 xfoil_exe_path = file_path / "xfoil_6.99"
 data_path = file_path / "data"
 
-def read_content(string_list:list , header_line_num:int, start_line_num:int, Re_line_num: int = None):
+def read_content(string_list:list , header_line_num:int, start_line_num:int, Re_line_num: int = None, Re_default:float=None):
     data = dict()
     header_line = re.sub(r'\s+', ",", string_list[header_line_num])
     header_list = list(filter(lambda x: x not in ["", "#"], header_line.split(",")))
@@ -20,10 +20,14 @@ def read_content(string_list:list , header_line_num:int, start_line_num:int, Re_
         Re_position = Re_line.index("Re")
 
         # checking for Re
-        if Re_line[Re_position + 3] == "e":
-            Re = float(Re_line[Re_position + 2]) * 10 ** int(Re_line[Re_position + 4])
-        else:
-            Re = float(Re_line[Re_position + 2])
+        
+        try:
+            if Re_line[Re_position + 3] == "e":
+                Re = float(Re_line[Re_position + 2]) * 10 ** int(Re_line[Re_position + 4])
+            else:
+                Re = float(Re_line[Re_position + 2])
+        except:
+            Re = Re_default
 
         # checking for alpha
         try:
@@ -33,7 +37,7 @@ def read_content(string_list:list , header_line_num:int, start_line_num:int, Re_
         except: 
             pass
         
-
+        
         data["Re"] = np.full(len(string_list[start_line_num:]), Re)
 
     for i in range(len(header_list)):
@@ -89,6 +93,12 @@ def format_dataset(aerofoil_name:str):
     string_list = ref_cp_file.readlines()
     ref_cp_dist_data = read_content(string_list, header_line_num, start_line_num, Re_line_num)
 
+    # storing coordinates
+    coord_data = dict(
+        x= ref_cp_dist_data["x"],
+        y= ref_cp_dist_data["y"]
+    )
+
     # initialising arrays for data
     for i in range(ref_cp_dist_data["Cp"].shape[0]):
         all_polar_data[f"Cp{i}"] = np.zeros(all_polar_data["alpha"].shape[0])
@@ -100,7 +110,7 @@ def format_dataset(aerofoil_name:str):
         for cp_filename in cp_files:
             cp_file = open(cp_filename, "r")
             string_list = cp_file.readlines()
-            single_cp_dist_data = read_content(string_list, header_line_num, start_line_num, Re_line_num)
+            single_cp_dist_data = read_content(string_list, header_line_num, start_line_num, Re_line_num, Re)
             # Re match
             Re_match = np.isclose(all_polar_data["Re"], single_cp_dist_data["Re"][0], rtol=1e-3)
             # alpha match
@@ -111,8 +121,9 @@ def format_dataset(aerofoil_name:str):
                 cp_array = all_polar_data[f"Cp{i}"] 
                 cp_array[match_index] = single_cp_dist_data["Cp"][i]
                 all_polar_data[f"Cp{i}"] = cp_array
-        print
+        
         
 
     df = pd.DataFrame(data=all_polar_data)
-    return df 
+    coords = pd.DataFrame(data=coord_data)
+    return df, coords
