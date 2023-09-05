@@ -1,6 +1,8 @@
 from xfoil.xfoil_wrapper import call_xfoil
 from xfoil.formatting import format_dataset
 import pathlib as plib
+import numpy as np
+import pandas as pd
 
 path = plib.Path(__file__).parent
 save_path = path.parents[1] / "data"
@@ -49,6 +51,12 @@ if __name__ == "__main__":
     )
     elif do == "format":
         df, coords = format_dataset(aerofoil_name)
-        df.to_csv(save_path / f"{aerofoil_name}.csv")
-        coords.to_csv(save_path / "coords" / f"{aerofoil_name}.csv")
-    
+        # df.to_csv(save_path / f"{aerofoil_name}.csv")
+        # coords.to_csv(save_path / "coords" / f"{aerofoil_name}.csv")
+            
+        df.attrs["Re_range"]=np.unique(df["Re"].to_numpy())
+        df.attrs["alpha_range"]=np.unique(df["alpha"].to_numpy())
+        df.attrs["x_coords"]=coords["x"]
+        df.attrs["y_coords"]=coords["y"]
+        
+        df.to_hdf(save_path / f"{aerofoil_name}.h5", key="performance_data")
