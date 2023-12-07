@@ -46,7 +46,7 @@ def get_matching_colnames(df:pd.DataFrame, model_inputs:list[str], model_outputs
     return matching_inputs, matching_outputs
 
 
-def get_dataset(df:pd.DataFrame, matching_inputs, matching_outputs):
+def get_dataset(df:pd.DataFrame, matching_inputs:list[str], matching_outputs:list[str]):
     # splitting training and test set
     train_df = df.sample(frac=.8, random_state=0)
     test_df = df.drop(train_df.index)

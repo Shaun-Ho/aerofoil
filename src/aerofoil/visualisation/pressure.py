@@ -10,7 +10,13 @@ current_file_path = plib.Path(__file__).parent
 data_path = current_file_path.parents[1] / "data"
 
 
-def Cp_vs_alpha(aerofoil_data:pd.DataFrame, metadata:dict[str, np.ndarray], Re:float, p_n_list: list=None):
+def Cp_vs_alpha(
+    aerofoil_data:pd.DataFrame, 
+    metadata:dict[str, np.ndarray],
+    Re:float,
+    p_n_list:list[int]=None,
+    alpha_n_list: list[int]=None
+):
     df = aerofoil_data
     x_list = metadata["x"]
     alpha_list = metadata["alpha_list"]
@@ -48,6 +54,10 @@ def Cp_vs_alpha(aerofoil_data:pd.DataFrame, metadata:dict[str, np.ndarray], Re:f
                 
             )
         )
+    
+    fig.update_layout(
+
+    )
 
     pyo.plot(fig, filename='offline_plot.html')
     
@@ -60,9 +70,10 @@ if __name__ == "__main__":
 
     # filtering data
     p_n_list = [1, 2]
+    alpha_n_list = [i for i in range(0,len(metadata["alpha_list"],5))]
     p_n_list = None
 
     Re = metadata["Re_list"][0]
     
-    Cp_vs_alpha(aerofoil_data, metadata, p_n_list=p_n_list, Re=Re)
+    Cp_vs_alpha(aerofoil_data, metadata, alpha_n_list=alpha_n_list, p_n_list=p_n_list, Re=Re)
 
