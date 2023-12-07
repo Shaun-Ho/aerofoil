@@ -164,3 +164,8 @@ cython_debug/
 *.txt
 *.xlsx
 *.nc
+*.h5
+models
+
+# plots
+*.html
